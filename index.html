@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Transcriber</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f11;
+      color: #e4e4e7;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #71717a;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #3f3f46;
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #18181b;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #6366f1;
+      background: #1e1b4b;
+    }
+
+    .drop-zone-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .drop-zone-text {
+      font-size: 1rem;
+      color: #a1a1aa;
+      line-height: 1.6;
+    }
+
+    .drop-zone-text strong {
+      color: #818cf8;
+    }
+
+    .drop-zone input[type="file"] { display: none; }
+
+    .supported {
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: #52525b;
+    }
+
+    /* Model selector */
+    .model-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: #18181b;
+      border-radius: 10px;
+      font-size: 0.85rem;
+    }
+
+    .model-bar label { color: #a1a1aa; white-space: nowrap; }
+
+    .model-bar select {
+      flex: 1;
+      background: #27272a;
+      color: #e4e4e7;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    /* File info */
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: #18181b;
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+
+    .file-info.visible { display: flex; }
+
+    .file-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-remove {
+      background: none;
+      border: none;
+      color: #71717a;
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 0 0.25rem;
+      transition: color 0.15s;
+    }
+    .file-remove:hover { color: #ef4444; }
+
+    /* Transcribe button */
+    .btn-transcribe {
+      display: none;
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.85rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #6366f1;
+      color: #fff;
+      transition: background 0.2s;
+    }
+
+    .btn-transcribe:hover { background: #4f46e5; }
+    .btn-transcribe:disabled {
+      background: #3f3f46;
+      cursor: not-allowed;
+      color: #71717a;
+    }
+    .btn-transcribe.visible { display: block; }
+
+    /* Progress */
+    .progress-section {
+      display: none;
+      margin-top: 1.25rem;
+    }
+
+    .progress-section.visible { display: block; }
+
+    .progress-label {
+      font-size: 0.85rem;
+      color: #a1a1aa;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 8px;
+      background: #27272a;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #818cf8);
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    /* Result */
+    .result-section {
+      display: none;
+      margin-top: 1.5rem;
+    }
+    .result-section.visible { display: block; }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .result-header h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .btn-copy {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      color: #a1a1aa;
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-copy:hover { background: #3f3f46; color: #e4e4e7; }
+
+    .result-text {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 10px;
+      padding: 1.25rem;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    /* Error */
+    .error-msg {
+      display: none;
+      margin-top: 1rem;
+      padding: 0.85rem 1rem;
+      background: #2d1215;
+      border: 1px solid #7f1d1d;
+      border-radius: 10px;
+      color: #fca5a5;
+      font-size: 0.9rem;
+    }
+    .error-msg.visible { display: block; }
+
+    @media (max-width: 500px) {
+      h1 { font-size: 1.4rem; }
+      .drop-zone { padding: 2rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Audio Transcriber</h1>
+  <p class="subtitle">Transcribe audio files locally in your browser using Whisper AI</p>
+
+  <div class="container">
+    <div class="drop-zone" id="dropZone">
+      <span class="drop-zone-icon">&#127908;</span>
+      <div class="drop-zone-text">
+        <strong>Click to upload</strong> or drag &amp; drop an audio file
+      </div>
+      <div class="supported">MP3, WAV, OGG, FLAC, WEBM, M4A &mdash; up to 25 MB</div>
+      <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.ogg,.flac,.webm,.m4a">
+    </div>
+
+    <div class="model-bar">
+      <label for="modelSelect">Model:</label>
+      <select id="modelSelect">
+        <option value="Xenova/whisper-tiny.en" selected>Tiny (English) &mdash; fastest</option>
+        <option value="Xenova/whisper-tiny">Tiny (Multilingual)</option>
+        <option value="Xenova/whisper-small.en">Small (English) &mdash; better accuracy</option>
+        <option value="Xenova/whisper-small">Small (Multilingual)</option>
+      </select>
+    </div>
+
+    <div class="file-info" id="fileInfo">
+      <span>&#128196;</span>
+      <span class="file-name" id="fileName"></span>
+      <button class="file-remove" id="fileRemove" title="Remove file">&times;</button>
+    </div>
+
+    <button class="btn-transcribe" id="btnTranscribe">Transcribe</button>
+
+    <div class="progress-section" id="progressSection">
+      <div class="progress-label" id="progressLabel">Loading model...</div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="result-section" id="resultSection">
+      <div class="result-header">
+        <h2>Transcription</h2>
+        <button class="btn-copy" id="btnCopy">Copy text</button>
+      </div>
+      <div class="result-text" id="resultText"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.1';
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileRemove = document.getElementById('fileRemove');
+    const btnTranscribe = document.getElementById('btnTranscribe');
+    const progressSection = document.getElementById('progressSection');
+    const progressLabel = document.getElementById('progressLabel');
+    const progressFill = document.getElementById('progressFill');
+    const errorMsg = document.getElementById('errorMsg');
+    const resultSection = document.getElementById('resultSection');
+    const resultText = document.getElementById('resultText');
+    const btnCopy = document.getElementById('btnCopy');
+    const modelSelect = document.getElementById('modelSelect');
+
+    let selectedFile = null;
+    let transcriber = null;
+    let currentModelId = null;
+
+    // --- Drop zone events ---
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+
+    fileRemove.addEventListener('click', () => {
+      selectedFile = null;
+      fileInput.value = '';
+      fileInfo.classList.remove('visible');
+      btnTranscribe.classList.remove('visible');
+      resultSection.classList.remove('visible');
+      hideError();
+    });
+
+    function handleFile(file) {
+      if (file.size > 25 * 1024 * 1024) {
+        showError('File is too large. Please choose a file under 25 MB.');
+        return;
+      }
+      selectedFile = file;
+      fileName.textContent = `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+      fileInfo.classList.add('visible');
+      btnTranscribe.classList.add('visible');
+      resultSection.classList.remove('visible');
+      hideError();
+    }
+
+    // --- Transcription ---
+    btnTranscribe.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      hideError();
+      resultSection.classList.remove('visible');
+      btnTranscribe.disabled = true;
+      progressSection.classList.add('visible');
+
+      try {
+        // Decode audio to raw PCM
+        progressLabel.textContent = 'Decoding audio...';
+        progressFill.style.width = '5%';
+        const audioData = await decodeAudio(selectedFile);
+
+        // Load or reuse model
+        const chosenModel = modelSelect.value;
+        if (!transcriber || currentModelId !== chosenModel) {
+          progressLabel.textContent = `Loading model (${modelSelect.selectedOptions[0].text.split('—')[0].trim()})... This may take a moment on first use.`;
+          progressFill.style.width = '10%';
+
+          transcriber = await pipeline('automatic-speech-recognition', chosenModel, {
+            progress_callback: (progress) => {
+              if (progress.status === 'progress' && progress.progress) {
+                const pct = Math.min(10 + progress.progress * 0.5, 60);
+                progressFill.style.width = pct + '%';
+              }
+            },
+          });
+          currentModelId = chosenModel;
+        }
+
+        progressLabel.textContent = 'Transcribing audio...';
+        progressFill.style.width = '65%';
+
+        const result = await transcriber(audioData, {
+          chunk_length_s: 30,
+          stride_length_s: 5,
+          return_timestamps: false,
+        });
+
+        progressFill.style.width = '100%';
+        progressLabel.textContent = 'Done!';
+
+        resultText.textContent = result.text.trim();
+        resultSection.classList.add('visible');
+      } catch (err) {
+        console.error(err);
+        showError(`Transcription failed: ${err.message}`);
+      } finally {
+        btnTranscribe.disabled = false;
+        setTimeout(() => progressSection.classList.remove('visible'), 1200);
+      }
+    });
+
+    async function decodeAudio(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      // Get mono channel at 16 kHz
+      const float32 = decoded.getChannelData(0);
+      await audioCtx.close();
+      return float32;
+    }
+
+    // --- Copy ---
+    btnCopy.addEventListener('click', () => {
+      navigator.clipboard.writeText(resultText.textContent).then(() => {
+        btnCopy.textContent = 'Copied!';
+        setTimeout(() => btnCopy.textContent = 'Copy text', 1500);
+      });
+    });
+
+    // --- Helpers ---
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.add('visible');
+    }
+    function hideError() {
+      errorMsg.classList.remove('visible');
+    }
+  </script>
+</body>
+</html>
