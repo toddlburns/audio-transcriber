@@ -244,6 +244,94 @@
     }
     .error-msg.visible { display: block; }
 
+    /* Login overlay */
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      background: #0f0f11;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .login-overlay.hidden { display: none; }
+
+    .login-box {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+
+    .login-box h2 {
+      font-size: 1.3rem;
+      margin-bottom: 0.25rem;
+      color: #fff;
+    }
+
+    .login-box p {
+      color: #71717a;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .login-box input[type="password"] {
+      width: 100%;
+      padding: 0.7rem 1rem;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      color: #e4e4e7;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .login-box input[type="password"]:focus {
+      border-color: #6366f1;
+    }
+
+    .login-box input[type="password"].shake {
+      animation: shake 0.4s ease;
+      border-color: #ef4444;
+    }
+
+    .login-box button {
+      width: 100%;
+      margin-top: 0.75rem;
+      padding: 0.7rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #6366f1;
+      color: #fff;
+      transition: background 0.2s;
+    }
+
+    .login-box button:hover { background: #4f46e5; }
+
+    .login-error {
+      color: #f87171;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+      min-height: 1.2em;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    .app-content.hidden { display: none; }
+
     @media (max-width: 500px) {
       h1 { font-size: 1.4rem; }
       .drop-zone { padding: 2rem 1rem; }
@@ -251,6 +339,20 @@
   </style>
 </head>
 <body>
+
+  <!-- Login overlay -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+      <h2>Audio Transcriber</h2>
+      <p>Enter the password to continue</p>
+      <input type="password" id="loginPassword" placeholder="Password" autocomplete="off">
+      <button id="loginBtn">Unlock</button>
+      <div class="login-error" id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- Main app (hidden until authenticated) -->
+  <div class="app-content hidden" id="appContent">
 
   <h1>Audio Transcriber</h1>
   <p class="subtitle">Transcribe audio files locally in your browser using Whisper AI</p>
@@ -301,7 +403,45 @@
     </div>
   </div>
 
+  </div><!-- end app-content -->
+
   <script type="module">
+    // --- Password gate ---
+    const PASS_HASH = '84458dd730e3b4987574c388f8e3ae1f6fdff4fb648a46401e0460f07c6f8271';
+    const loginOverlay = document.getElementById('loginOverlay');
+    const appContent = document.getElementById('appContent');
+    const loginPassword = document.getElementById('loginPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+
+    async function sha256(text) {
+      const data = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function attemptLogin() {
+      const hash = await sha256(loginPassword.value);
+      if (hash === PASS_HASH) {
+        sessionStorage.setItem('authed', '1');
+        loginOverlay.classList.add('hidden');
+        appContent.classList.remove('hidden');
+      } else {
+        loginError.textContent = 'Incorrect password';
+        loginPassword.classList.add('shake');
+        setTimeout(() => loginPassword.classList.remove('shake'), 400);
+      }
+    }
+
+    loginBtn.addEventListener('click', attemptLogin);
+    loginPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
+
+    if (sessionStorage.getItem('authed') === '1') {
+      loginOverlay.classList.add('hidden');
+      appContent.classList.remove('hidden');
+    }
+
+    // --- App ---
     import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.1';
 
     const dropZone = document.getElementById('dropZone');
